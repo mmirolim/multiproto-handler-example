@@ -20,9 +20,9 @@ var (
 		From func(data []byte, v interface{}) error
 		To   func(v interface{}) ([]byte, error)
 	}{
-		"json": {json.Unmarshal, json.Marshal},
-		"xml":  {xml.Unmarshal, xml.Marshal},
-		"csv":  {fromCSV, toCSV},
+		"application/json": {json.Unmarshal, json.Marshal},
+		"application/xml":  {xml.Unmarshal, xml.Marshal},
+		"application/csv":  {fromCSV, toCSV},
 		// TODO add protobuf, some custom formats
 	}
 )
@@ -113,22 +113,16 @@ func SetProto(f func(string, string) http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// protoFrom get from content type
 		// protoTo get from header
-		conttype := strings.Split(r.Header.Get("Content-type"), "/")
-		if len(conttype) == 2 {
-			if _, ok := protos[conttype[1]]; ok {
-				protoFrom := conttype[1]
-				restype := strings.Split(r.Header.Get("Response-type"), "/")
-				// default response proto
-				protoTo := protoFrom
-				if len(restype) == 2 {
-					if _, ok := protos[restype[1]]; ok {
-						protoTo = restype[1]
-					}
-				}
-
-				f(protoFrom, protoTo)(w, r)
-				return
+		protoFrom := r.Header.Get("Content-type")
+		protoTo := r.Header.Get("Response-type")
+		if _, ok := protos[protoFrom]; ok {
+			if _, ok := protos[protoTo]; !ok {
+				// not supported use content type as response type
+				protoTo = protoFrom
 			}
+
+			f(protoFrom, protoTo)(w, r)
+			return
 		}
 
 		http.Error(w, "not supported proto", http.StatusBadRequest)
